@@ -24,7 +24,7 @@ jobs:
           echo "zephyr_version=${ZEPHYR_VERSION}" >> $GITHUB_ENV
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up build tools
         run: |
@@ -36,7 +36,7 @@ jobs:
           npm install -g lv_font_conv
 
       - name: Cache west modules
-        uses: actions/cache@v3.0.11
+        uses: actions/cache@v4
         continue-on-error: true
         env:
           cache_name: cache-zephyr-${{ env.zephyr_version }}-modules
@@ -79,9 +79,9 @@ jobs:
           cp build/zephyr/zmk.bin "build/artifacts/${{ matrix.board }}-zmk.bin"
 
       - name: Archive
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: firmware
+          name: firmware-${{ matrix.board }}
           path: build/artifacts
 
   release:
@@ -92,13 +92,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: firmware
+          pattern: firmware-*
           path: firmware
+          merge-multiple: true
 
       - name: Prepare release notes
         id: release
