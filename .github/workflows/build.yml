@@ -11,6 +11,7 @@ jobs:
       image: zmkfirmware/zmk-build-arm:stable
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - { board: hw75_keyboard@1.1, keymap: hw75_keyboard.keymap  }
@@ -28,10 +29,10 @@ jobs:
 
       - name: Set up build tools
         run: |
-          apt-get update
-          apt-get install -y python3-pip protobuf-compiler curl
+          apt-get -o Acquire::Retries=5 update
+          apt-get -o Acquire::Retries=5 install -y python3-pip protobuf-compiler curl
           curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
-          apt-get install -y nodejs
+          apt-get -o Acquire::Retries=5 install -y nodejs
           pip install -U fonttools --break-system-packages
           npm install -g lv_font_conv
 
