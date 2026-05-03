@@ -1,26 +1,42 @@
--- Hammerspoon bridge for the HW-75 Dynamic "dimmer" knob mode.
+-- Hammerspoon bridge for HW-75 Dynamic Home Assistant controls.
 --
 -- Firmware mapping:
---   F21: increase brightness value
---   F20: decrease brightness value
+--   Scene mode:
+--     F19: activate next scene
+--     F18: activate previous scene
+--   Dimmer mode:
+--     F21: increase brightness value
+--     F20: decrease brightness value
 --
 -- Usage:
 --   1. Install Hammerspoon on macOS.
---   2. Copy or load this file from ~/.hammerspoon/init.lua.
---   3. Fill in HA_BASE_URL, HA_TOKEN, and LIGHT_ENTITY_ID.
+--   2. Load this file from ~/.hammerspoon/init.lua with dofile(...).
+--   3. Fill in HA_BASE_URL, HA_TOKEN, LIGHT_ENTITY_ID, and SCENES.
 
 local HA_BASE_URL = "http://homeassistant.local:8123"
 local HA_TOKEN = "PUT_LONG_LIVED_ACCESS_TOKEN_HERE"
+
 local LIGHT_ENTITY_ID = "light.your_light"
 local DEFAULT_PCT = 50
 local CHANGE_PER_NOTCH_PCT = 5
 local SEND_DEBOUNCE_SECONDS = 0.12
 local TRANSITION_SECONDS = 0.2
 
+local SCENES = {
+    { name = "工作", entity_id = "scene.work" },
+    { name = "观影", entity_id = "scene.movie" },
+    { name = "睡前", entity_id = "scene.bedtime" },
+}
+local SCENE_DEBOUNCE_SECONDS = 0.15
+
 local currentPct = DEFAULT_PCT
 local hasSynced = false
 local pendingPct = nil
 local sendTimer = nil
+
+local currentSceneIndex = 1
+local pendingSceneIndex = nil
+local sceneTimer = nil
 
 local function clamp(value, minValue, maxValue)
     return math.max(minValue, math.min(maxValue, value))
@@ -37,15 +53,37 @@ local function headers()
     }
 end
 
+local function showStatus(message)
+    if hs.alert then
+        hs.alert.show(message, 0.8)
+    end
+end
+
 local function notifyFailure(status, body)
     hs.notify.new({
-        title = "HW-75 dimmer",
+        title = "HW-75 Home Assistant",
         informativeText = string.format(
-            "Home Assistant request failed: %s %s",
+            "Request failed: %s %s",
             tostring(status or "unknown"),
             body or ""
         ),
     }):send()
+end
+
+local function postService(domain, service, payload, callback)
+    local url = haUrl("/api/services/" .. domain .. "/" .. service)
+    local body = hs.json.encode(payload)
+
+    hs.http.asyncPost(url, body, headers(), function(status, responseBody)
+        if not status or status < 200 or status >= 300 then
+            notifyFailure(status, responseBody)
+            return
+        end
+
+        if callback then
+            callback(status, responseBody)
+        end
+    end)
 end
 
 local function brightnessToPct(brightness)
@@ -89,13 +127,8 @@ local function callLightService(pct)
         payload.brightness_pct = pct
     end
 
-    local url = haUrl("/api/services/light/" .. service)
-    local body = hs.json.encode(payload)
-
-    hs.http.asyncPost(url, body, headers(), function(status, responseBody)
-        if not status or status < 200 or status >= 300 then
-            notifyFailure(status, responseBody)
-        end
+    postService("light", service, payload, function()
+        showStatus("调光 " .. tostring(pct) .. "%")
     end)
 end
 
@@ -137,7 +170,85 @@ local function changeBrightness(deltaPct)
     setBrightnessPct(currentPct + deltaPct)
 end
 
+local function sceneAt(index)
+    return SCENES[index]
+end
+
+local function sceneEntityId(scene)
+    if type(scene) == "string" then
+        return scene
+    end
+
+    return scene.entity_id
+end
+
+local function sceneName(scene)
+    if type(scene) == "string" then
+        return scene
+    end
+
+    return scene.name or scene.entity_id
+end
+
+local function activateScene(index)
+    local scene = sceneAt(index)
+    if not scene then
+        showStatus("未配置场景")
+        return
+    end
+
+    local entityId = sceneEntityId(scene)
+    if not entityId or entityId == "" then
+        showStatus("场景缺少 entity_id")
+        return
+    end
+
+    postService("scene", "turn_on", { entity_id = entityId }, function()
+        showStatus("场景 " .. sceneName(scene))
+    end)
+end
+
+local function flushPendingScene()
+    sceneTimer = nil
+
+    if pendingSceneIndex == nil then
+        return
+    end
+
+    local index = pendingSceneIndex
+    pendingSceneIndex = nil
+    activateScene(index)
+end
+
+local function scheduleSceneActivation(index)
+    pendingSceneIndex = index
+
+    if sceneTimer then
+        sceneTimer:stop()
+    end
+
+    sceneTimer = hs.timer.doAfter(SCENE_DEBOUNCE_SECONDS, flushPendingScene)
+end
+
+local function changeScene(delta)
+    if #SCENES == 0 then
+        showStatus("未配置场景")
+        return
+    end
+
+    currentSceneIndex = ((currentSceneIndex - 1 + delta) % #SCENES) + 1
+    scheduleSceneActivation(currentSceneIndex)
+end
+
 syncBrightnessFromHomeAssistant()
+
+hs.hotkey.bind({}, "F19", function()
+    changeScene(1)
+end)
+
+hs.hotkey.bind({}, "F18", function()
+    changeScene(-1)
+end)
 
 hs.hotkey.bind({}, "F21", function()
     changeBrightness(CHANGE_PER_NOTCH_PCT)

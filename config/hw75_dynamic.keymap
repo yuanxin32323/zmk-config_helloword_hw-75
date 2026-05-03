@@ -92,6 +92,13 @@
 			sensor-bindings = <&zoom>;
 		};
 
+		scene {
+			label = "场景";
+			icon = [EF 86 B3];
+			bindings = <&trans &trans>;
+			sensor-bindings = <&inc_dec_kp F19 F18>;
+		};
+
 		dimmer {
 			label = "调光";
 			icon = [EF 86 85];
