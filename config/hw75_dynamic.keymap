@@ -32,6 +32,24 @@
 				   <&macro_release &kp LSHIFT>,
 				   <&macro_release &kp LGUI>;
 		};
+
+		zoom_in: zoom-in {
+			label = "ZOOM_IN";
+			compatible = "zmk,behavior-macro";
+			#binding-cells = <0>;
+			bindings = <&macro_press   &kp LGUI>,
+				   <&macro_tap     &kp EQUAL>,
+				   <&macro_release &kp LGUI>;
+		};
+
+		zoom_out: zoom-out {
+			label = "ZOOM_OUT";
+			compatible = "zmk,behavior-macro";
+			#binding-cells = <0>;
+			bindings = <&macro_press   &kp LGUI>,
+				   <&macro_tap     &kp MINUS>,
+				   <&macro_release &kp LGUI>;
+		};
 	};
 
 	behaviors {
@@ -40,6 +58,13 @@
 			label = "SWITCH_TASKS";
 			#sensor-binding-cells = <0>;
 			bindings = <&tasks_forward>, <&tasks_backward>;
+		};
+
+		zoom: zoom {
+			compatible = "zmk,behavior-sensor-rotate";
+			label = "ZOOM";
+			#sensor-binding-cells = <0>;
+			bindings = <&zoom_in>, <&zoom_out>;
 		};
 	};
 
@@ -58,6 +83,13 @@
 			icon = [EF 86 8A];
 			bindings = <&trans &trans>;
 			sensor-bindings = <&inc_dec_mw MW_DN(1) MW_UP(1)>;
+		};
+
+		zoom_layer {
+			label = "缩放";
+			icon = [EF 84 81];
+			bindings = <&trans &trans>;
+			sensor-bindings = <&zoom>;
 		};
 
 		dimmer {
